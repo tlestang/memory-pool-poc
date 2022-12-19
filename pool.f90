@@ -12,8 +12,6 @@ module pool_module
      module procedure memory_block_constructor
   end interface memory_block_t
 
-  real, target :: memblock(256)
-
 contains
 
   function memory_block_constructor(size, next) result(m)
@@ -27,25 +25,32 @@ contains
     m%next => next
   end function memory_block_constructor
 
-  function get_memory_block() result(handle)
-    real, pointer :: handle(:)
-    handle => memblock
+  function get_memory_block(ptr) result(handle)
+    type(memory_block_t), pointer, intent(inout) :: ptr
+    type(memory_block_t), pointer :: handle
+    handle => ptr
+    ptr => ptr%next
+    handle%next => null()
   end function get_memory_block
 
-  subroutine release_memory_block(handle)
-    real, pointer :: handle(:)
-    nullify(handle)
+  subroutine release_memory_block(ptr, handle)
+    type(memory_block_t), pointer, intent(inout) :: ptr
+    type(memory_block_t), pointer :: handle, current
+    handle%next => ptr
+    ptr => handle
   end subroutine release_memory_block
 
-  function init_memory_pool() result(first)
+  function init_memory_pool(nblocks, size) result(first)
+    !! Constructs a linked list of memory_block_t instances.
+    !! Retuns a pointer to the first item in the list
     type(memory_block_t), pointer :: first
     type(memory_block_t), pointer :: current
-    integer :: i
+    integer :: i, size, nblocks
 
     nullify(first)
-    do i = 1, 3
+    do i = 1, nblocks
        allocate(current)
-       current = memory_block_t(16, first)
+       current = memory_block_t(size, first)
        first => current
     end do
 
