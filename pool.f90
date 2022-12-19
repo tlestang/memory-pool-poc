@@ -2,14 +2,30 @@ module pool_module
   implicit none
 
   type :: memory_block_t
-     real :: a
+     integer :: size
+     real, allocatable :: segment(:)
      integer :: refcount
      type(memory_block_t), pointer :: next
   end type memory_block_t
 
+  interface memory_block_t
+     module procedure memory_block_constructor
+  end interface memory_block_t
+
   real, target :: memblock(256)
 
 contains
+
+  function memory_block_constructor(size, next) result(m)
+    integer, intent(in) :: size
+    type(memory_block_t), pointer, intent(in) :: next
+    type(memory_block_t) :: m
+
+    m%size = size
+    allocate(m%segment(size))
+    m%refcount = 0
+    m%next => next
+  end function memory_block_constructor
 
   function get_memory_block() result(handle)
     real, pointer :: handle(:)
@@ -29,7 +45,7 @@ contains
     nullify(first)
     do i = 1, 3
        allocate(current)
-       current = memory_block_t(1. * i, 0, first)
+       current = memory_block_t(16, first)
        first => current
     end do
 
@@ -43,7 +59,8 @@ contains
     current => ptr
     do
        if(.not. associated(current)) exit
-       write(*,*) current%a
+       write(*,*) allocated(current%segment)
+       write(*,*) size(current%segment)
        current => current%next
     end do
 
