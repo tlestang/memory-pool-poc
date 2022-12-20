@@ -11,7 +11,7 @@ program main_pool
   memblock => get_memory_block()
   call print_freelist()
   write(*,*) '--------'
-  call release_memory_block(memblock)
+  call unbind_or_release(memblock)
   call print_freelist()
   write(*,*) '--------'
   call finalise_memory_pool()

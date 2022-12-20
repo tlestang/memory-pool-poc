@@ -39,13 +39,24 @@ contains
     handle => first
     first => first%next
     handle%next => null()
+    handle%refcount = handle%refcount + 1
   end function get_memory_block
 
-  subroutine release_memory_block(handle)
-    type(memory_block_t), pointer :: handle, current
-    handle%next => first
-    first => handle
-  end subroutine release_memory_block
+  subroutine unbind_or_release(handle)
+    type(memory_block_t), pointer :: handle
+    ! TODO CLEANUP ASSERT
+    write(*,*) 'Unbinding mem block with refcount', handle%refcount
+    if (handle%refcount == 0) then
+       stop 'Refcount cannot be zero here'
+    end if
+    handle%refcount = handle%refcount - 1
+    if (handle%refcount == 0) then
+       write(*,*) '    Releasing memory block to pool'
+       ! Reattach memory block in front of free list
+       handle%next => first
+       first => handle
+    end if
+  end subroutine unbind_or_release
 
   subroutine init_memory_pool(nblocks, size)
     !! Constructs a linked list of memory_block_t instances.
