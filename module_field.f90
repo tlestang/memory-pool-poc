@@ -13,9 +13,9 @@ module field
      module procedure field_constructor
   end interface field_t
 
-  interface assignment
+  interface assignment(=)
      module procedure field_from_field
-  end interface assignment
+  end interface
 
 contains
 
