@@ -41,7 +41,6 @@ contains
     handle => first
     first => first%next
     handle%next => null()
-    handle%refcount = handle%refcount + 1
   end function get_memory_block
 
   subroutine unbind_or_release(handle)
