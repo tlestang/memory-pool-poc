@@ -6,6 +6,7 @@ module pool_module
      real, allocatable :: segment(:)
      integer :: refcount
      type(memory_block_t), pointer :: next
+     integer :: id
    contains
      final :: deallocate_memory_block_segment
   end type memory_block_t
@@ -18,8 +19,8 @@ module pool_module
 
 contains
 
-  function memory_block_constructor(size, next) result(m)
-    integer, intent(in) :: size
+  function memory_block_constructor(size, next, id) result(m)
+    integer, intent(in) :: size, id
     type(memory_block_t), pointer, intent(in) :: next
     type(memory_block_t) :: m
 
@@ -27,6 +28,7 @@ contains
     allocate(m%segment(size))
     m%refcount = 0
     m%next => next
+    m%id = id
   end function memory_block_constructor
 
   subroutine deallocate_memory_block_segment(self)
@@ -67,7 +69,7 @@ contains
     nullify(first)
     do i = 1, nblocks
        allocate(current)
-       current = memory_block_t(size, first)
+       current = memory_block_t(size, first, id=i)
        first => current
     end do
   end subroutine init_memory_pool
@@ -88,8 +90,7 @@ contains
     current => first
     do
        if(.not. associated(current)) exit
-       write(*,*) allocated(current%segment)
-       write(*,*) size(current%segment)
+       write(*,*) current%id, allocated(current%segment)
        current => current%next
     end do
 
