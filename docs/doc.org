@@ -1,0 +1,244 @@
+# -*- org-confirm-babel-evaluate: nil; org-html-htmlize-output-type: css; -*-
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/rethink_inline.css"/>
+#+HTML_HEAD_EXTRA: <link rel="highlighting" type="text/css" href="css/highlighting.css"/>
+
+#+PROPERTY: header-args:dot :exports results
+#+PROPERTY: header-args:f90 :exports code
+
+#+STARTUP: inlineimages
+
+#+TITLE: Derived type calculus based on a simple memory pool
+
+* Objective
+
+This document describes a simple memory management strategy enabling
+the manipulation of objects without repeated memory allocation or data
+copy.  For instance
+
+#+begin_src f90
+  type(field_t) :: u, v
+
+  !...
+
+  w = v + 2. * u
+#+end_src
+
+would likely result in 2 allocations for intermediate evualuations
+(=2. * u= and =v + 2. * u=) as well as a data copy for the assignment.
+
+Instead, an implementation based on a memory pool can make such
+expressions work with pre-allocated memory blocks. Therefore no
+intermediate allocation and data copy are needed.
+
+* Memory pool as a linked list
+
+The memory pool is implemented as a linked list of memory blocks
+(i.e. a [[https://en.wikipedia.org/wiki/Free_list][free list]]). Each memory block as equal size.
+
+#+begin_src dot :file freelist.png :cmdline -Kdot -Tpng
+  digraph freelist {
+	  rank=LR;
+	  memblock1 [label="memory block\lid: 1"];
+	  memblock2 [label="memory block\lid: 2"];
+	  memblock3 [label="memory block\lid: 3"];
+
+	  memblock1 -> memblock2 -> memblock3;
+  }
+#+end_src
+
+#+RESULTS:
+[[file:freelist.png]]
+
+
+Allocation from the memory pool is equivalement to popping a memory
+block off the front of the list, and releasing a memory block is
+equivalent to pushing it back to the front of the list.
+
+In practice, the memory pool is constructed, and the blocks allocated
+with:
+
+#+begin_src f90
+    call init_memory_pool(nblocks, size)
+#+end_src
+
+Applications can request a block from the memory pool using the
+=get_memory_block= function.
+
+#+begin_src f90
+    use pool_module, only: memory_block_t, get_memory_block
+    type(memory_block_t), pointer :: memblock_ptr
+
+    memblock_ptr => get_memory_block()
+#+end_src
+
+The =get_memory_block= function returns a pointer to =memory_block_t=,
+which target is the head of the memory block list.
+
+#+begin_src dot :file allocation.png :cmdline -Kdot -Tpng
+  digraph allocation {
+
+  memblock1 [label="memory block\lid: 1\lrefcount: 1\l"];
+  memblock2 [label="memory block\lid: 2"];
+  memblock3 [label="memory block\lid: 3"];
+  ptr [shape=box, label="memblock_ptr"]
+
+  memblock2 -> memblock3;
+  ptr -> memblock1;
+  }
+#+end_src
+
+#+RESULTS:
+[[file:freelist.png]]
+
+A memory block can be released to the memory pool using the
+=unbind_or_release= subroutine.
+
+#+begin_src f90
+    call unbind_or_release(memblock_ptr)
+#+end_src
+
+A memory block's metadata include its /reference count/, an integer
+counting the number of pointers pointing to the memory block.  A
+memory block available in the memory pool has a reference count of 0.
+Assignment of a memory block to a =memory_block_t= pointer increments
+it reference count by 1.  The =unbind_or_release= subroutine
+decrements the reference count of the memory block targeted by
+=memblock_ptr=. If the blocks's reference count reaches 0, the block
+is released to the memory pool: it is pushed back to the front of the
+free list.
+
+#+begin_src dot :file deallocation.png :cmdline -Kdot -Tpng
+  digraph deallocation {
+
+  memblock1 [label="memory block\lid: 1\lrefcount: 0\l"];
+  memblock2 [label="memory block\lid: 2\lrefcount: 0\l"];
+  memblock3 [label="memory block\lid: 3\lrefcount: 0\l"];
+  ptr [shape=box, label="memblock_ptr"]
+
+  memblock1 -> memblock2 -> memblock3;
+  ptr
+  }
+#+end_src
+
+#+RESULTS:
+[[file:freelist.png]]
+
+Finally , the memory pool can be destroyed, and all its memory blocks
+deallocated, with
+
+#+begin_src f90
+    call finalise_memory_pool()
+#+end_src
+
+* Derived type calculus using the memory pool
+
+We introduce a derives type =field_t= that holds a pointer to a memory block
+
+#+begin_src f90
+  type field_t
+     type(memory_block_t), pointer :: data => null()
+   contains
+     ! ...
+  end type field_t
+#+end_src
+
+A =field_t= object is assigned a memory block upon instanciation, for
+instance by calling =get_memory_block= from the =field_t= constructor.
+
+#+begin_src f90
+  type(field_t) :: u, v
+  ! Construct two distinct field instances
+  u = field_t()
+  v = field_t()
+#+end_src
+
+Both =field_t= instances =u= and =v= hold a pointer to a different
+memory block:
+
+#+begin_src dot :file field_creation.png :cmdline -Kdot -Tpng
+  digraph field_creation {
+
+  subgraph cluster_list {
+	  label = "Free list"
+	  memblock3 [label="memory block\lid: 3"];
+
+	  memblock3;
+  }
+
+  subgraph cluster_field {
+	  rankdir=LR;
+	  field1 [shape=box, label="u"]
+	  field2 [shape=box, label="v"]
+	  memblock1 [label="memory block\lid: 1\lrefcount: 1\l"]
+	  memblock2 [label="memory block\lid: 2\lrefcount: 1\l"]
+
+
+	  field1 -> memblock1
+	  field2 -> memblock2
+  }}
+#+end_src
+
+By default, an assignment statement like =v=u= would result in a copy
+or automatic allocation on assignment.  Instead, the =field_t=
+assignement operator is defined to redirect =v='s memory block pointer to =u='s.
+
+#+begin_src f90
+    v = u ! Now both u and v data pointer points to the same memory block
+#+end_src
+
+#+begin_src dot :file finalisation_on_assign.png :cmdline -Kdot -Tpng
+  digraph finalisation_on_assign {
+
+  subgraph cluster_list {
+	  label = "Free list"
+	  memblock2 [label="memory block\lid: 2"];
+	  memblock3 [label="memory block\lid: 3"];
+
+	  memblock2 -> memblock3;
+  }
+
+  subgraph cluster_field {
+	  rankdir=LR;
+	  field1 [shape=box, label="u"]
+	  field2 [shape=box, label="v"]
+	  memblock [label="memory block\lid: 1\lrefcount: 2\l"]
+
+
+	  field1 -> memblock
+	  field2 -> memblock
+  }}
+#+end_src
+
+#+RESULTS:
+[[file:sample.png]]
+
+Notice how the reference count for memory block 0 is increased to two.
+
+Objects of type =field_t= automatically release the memory block they
+point to when they are on the left hand side of an assignment or
+passed to a procedure in which the corresponding dummy argument as the
+=intent(out)= attribute. This behavior comes from marking the field
+destructor as =final= in the =field_t= derived type definition (see [5]).
+
+Let's unpack what happens in an assignment statement such as
+
+#+begin_src f90
+    v = u
+#+end_src
+
+1. Memory block targeted by =v='s =data= pointer is released, or its
+   reference count decremented, through =unbind_or_release=.
+2. =v='s data pointer is made to point to the target of =u='s data
+   pointer (=v%data => u%data=).
+3. The reference count for the targeted memory block is increased by 1.
+
+* References
+
+- [1] [[https://www.boost.org/doc/libs/1_81_0/libs/pool/doc/html/boost_pool/pool/pooling.html#boost_pool.pool.pooling.concepts][Pool in More Depth]] (Boost.Pool documentation)
+- [2] [[https://theboostcpplibraries.com/boost.pool][Chapter 4 - Boost.Pool]] (The Boost C++ Libraries)
+- [3] [[https://en.wikipedia.org/wiki/Free_list][Free list]] (Wikipedia)
+- [4] [[https://comp.anu.edu.au/courses/comp2310/labs/05-malloc/#simple-free-list-allocator][Simple free list allocator]] (ANU's Systems, Networks, and Concurrency
+  course).
+- [5] [[https://global.oup.com/academic/product/modern-fortran-explained-9780198811893?cc=fr&lang=en&][Modern Fortran Explained, Incorporating Fortran 2018]] (5th ed)
+  (Sections 15.11 Finalization, 2.12 Pointers and 3.13 Pointers in
+  expressions and assignments).
