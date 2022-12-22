@@ -135,8 +135,21 @@ contains
        write(*,*) current%id, allocated(current%segment)
        current => current%next
     end do
-
   end subroutine print_freelist
+
+  function get_block_ids()
+    integer, allocatable :: get_block_ids(:)
+    type(memory_block_t), pointer :: current
+
+    current => first
+    get_block_ids = [current%id]
+    do
+       if(.not. associated(current%next)) exit
+       get_block_ids = [get_block_ids, current%next%id]
+       current => current%next
+    end do
+  end function get_block_ids
+
 
   function memory_block_add_memory_block(a, b) result(c)
     !> Return a pointer to a new memory block holding the sum of the
