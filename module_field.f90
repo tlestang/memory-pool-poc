@@ -1,4 +1,4 @@
-module field
+module field_module
   !> This module provides a field_t type that represents a scalar
   !> field.  A field_t holds a pointer to a memory_block_t instance
   !> that provides the storage required to store the field values.  .
@@ -76,4 +76,4 @@ contains
 
     field_add_field%data => a%data + b%data
   end function field_add_field
-end module field
+end module field_module

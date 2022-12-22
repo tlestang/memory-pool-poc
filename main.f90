@@ -1,5 +1,5 @@
 program main
-  use field
+  use field_module
   use pool_module
 
   type(field_t) :: u, v, w
