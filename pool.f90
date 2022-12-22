@@ -15,6 +15,10 @@ module pool_module
      module procedure memory_block_constructor
   end interface memory_block_t
 
+  interface operator(+)
+     module procedure :: memory_block_add_memory_block
+  end interface operator(+)
+
   type(memory_block_t), pointer :: first
 
 contains
@@ -94,4 +98,13 @@ contains
     end do
 
   end subroutine print_freelist
+
+  function memory_block_add_memory_block(a, b) result(c)
+    type(memory_block_t), intent(in) :: a, b
+    type(memory_block_t), pointer :: c
+
+    c => get_memory_block()
+    c%segment = a%segment + b%segment
+    c%refcount = c%refcount + 1
+  end function memory_block_add_memory_block
 end module pool_module
