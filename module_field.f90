@@ -16,6 +16,9 @@ module field
   interface assignment(=)
      module procedure field_from_field
   end interface
+  interface operator(+)
+     module procedure field_add_field
+  end interface operator(+)
 
 contains
 
@@ -37,4 +40,11 @@ contains
     b%data%refcount = b%data%refcount + 1
   end subroutine field_from_field
 
+  function field_add_field(a, b)
+    type(field_t) :: field_add_field
+    type(field_t), intent(in) :: a
+    type(field_t), intent(in) :: b
+
+    field_add_field%data => a%data + b%data
+  end function field_add_field
 end module field
