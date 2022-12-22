@@ -10,12 +10,13 @@ module field
   end type field_t
 
   interface field_t
-     module procedure field_constructor
+     module procedure :: field_constructor, field_from_real
   end interface field_t
 
   interface assignment(=)
      module procedure field_from_field
-  end interface
+  end interface assignment(=)
+
   interface operator(+)
      module procedure field_add_field
   end interface operator(+)
@@ -25,6 +26,12 @@ contains
   type(field_t) function field_constructor() result(f)
     f%data => get_memory_block()
   end function field_constructor
+
+  type(field_t) function field_from_real(a) result(f)
+    real, intent(in) :: a
+    f%data => get_memory_block()
+    f%data%segment = a
+  end function field_from_real
 
   subroutine field_destructor(self)
     type(field_t), intent(inout) :: self
