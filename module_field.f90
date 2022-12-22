@@ -43,8 +43,7 @@ contains
   subroutine field_from_field(a, b)
     type(field_t), intent(out) :: a
     type(field_t), intent(in) :: b
-    a%data => b%data
-    b%data%refcount = b%data%refcount + 1
+    a%data => bind_block(b%data)
   end subroutine field_from_field
 
   function field_add_field(a, b)

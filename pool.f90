@@ -47,6 +47,14 @@ contains
     handle%next => null()
   end function get_memory_block
 
+  function bind_block(memblock_ptr)
+    type(memory_block_t), pointer, intent(in) :: memblock_ptr
+    type(memory_block_t), pointer :: bind_block
+
+    bind_block => memblock_ptr
+    bind_block%refcount = bind_block%refcount + 1
+  end function bind_block
+
   subroutine unbind_or_release(handle)
     type(memory_block_t), pointer :: handle
     ! TODO CLEANUP ASSERT
