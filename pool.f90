@@ -1,4 +1,17 @@
 module pool_module
+  !! This module defines a derived type memory_block_t and a memory
+  !! pool as a list of memory_block_t instances.
+  !!
+  !! A memory_block_t object encapsulate data storage (in the form of
+  !! an array of intrinsic type) and metadata.
+  !!
+  !! The memory pool is a linked list of memory blocks.  Storage for
+  !! memory blocks is allocated when the the list is created and
+  !! released when it is finalised.  Memory pool is created using
+  !!
+  !! call init_memory_pool(nblocks, size)
+  !!
+  !!
   implicit none
 
   type :: memory_block_t
@@ -8,6 +21,8 @@ module pool_module
      type(memory_block_t), pointer :: next
      integer :: id
    contains
+     !> final procedures are called whenever type instance is passed
+     !> as intent(out) or deallocated.
      final :: deallocate_memory_block_segment
   end type memory_block_t
 
@@ -41,6 +56,10 @@ contains
   end subroutine deallocate_memory_block_segment
 
   function get_memory_block() result(handle)
+    !> Returns a pointer to the first available memory block, i.e. the
+    !> head of the free memory block list.
+    !> Example
+    !>     f%data => get_memory_block()
     type(memory_block_t), pointer :: handle
     handle => first
     first => first%next
@@ -48,6 +67,8 @@ contains
   end function get_memory_block
 
   function bind_block(memblock_ptr)
+    !> Update refcount for memory block pointed by memblock_ptr and
+    !> returns pointer.
     type(memory_block_t), pointer, intent(in) :: memblock_ptr
     type(memory_block_t), pointer :: bind_block
 
@@ -56,6 +77,9 @@ contains
   end function bind_block
 
   subroutine unbind_or_release(handle)
+    !> Decrement refcount for target memory block.  If refcount
+    !> reaches 0, the memory block is released to the pool and pushed
+    !> to the front of the free memory block list.
     type(memory_block_t), pointer :: handle
     ! TODO CLEANUP ASSERT
     write(*,*) 'Unbinding mem block with refcount', handle%refcount
@@ -72,20 +96,27 @@ contains
   end subroutine unbind_or_release
 
   subroutine init_memory_pool(nblocks, size)
-    !! Constructs a linked list of memory_block_t instances.
-    !! Retuns a pointer to the first item in the list
+    !> Constructs a linked list of memory_block_t instances.  Module
+    !> global pointer first always points to the first memory block on
+    !> the list.
     type(memory_block_t), pointer :: current
     integer :: i, size, nblocks
 
     nullify(first)
     do i = 1, nblocks
        allocate(current)
+       !> Construct a memory_block_t. This effectiveley allocates
+       !> storage space.
        current = memory_block_t(size, first, id=i)
        first => current
     end do
   end subroutine init_memory_pool
 
   subroutine finalise_memory_pool()
+    !> Destroy each memory block in the free memory block list, from
+    !> head to tail.  Deallocation of a memory_block_t triggers all
+    !> final (see def of memory_block_t type) procedures and therefore
+    !> deallocation of the block's storage space.
     type(memory_block_t), pointer :: current
     do
        if(.not. associated(first)) exit
@@ -108,6 +139,8 @@ contains
   end subroutine print_freelist
 
   function memory_block_add_memory_block(a, b) result(c)
+    !> Return a pointer to a new memory block holding the sum of the
+    !> two operands segment.
     type(memory_block_t), intent(in) :: a, b
     type(memory_block_t), pointer :: c
 
