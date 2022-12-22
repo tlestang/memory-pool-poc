@@ -232,6 +232,17 @@ Let's unpack what happens in an assignment statement such as
    pointer (=v%data => u%data=).
 3. The reference count for the targeted memory block is increased by 1.
 
+* Design decisions
+
+** refcount
+
+How to manage refcount? Currently (be289f5) refcount is managed at the
+level of the pool module. When implementating assignment applications
+use pool::bind_block which takes care of redirect pointer /and/
+increment refcount.  In the same way =operator(+)= for
+=memory_block_t= is responsible for incrementing refcount for the
+block targeted by the returned pointer.
+
 * References
 
 - [1] [[https://www.boost.org/doc/libs/1_81_0/libs/pool/doc/html/boost_pool/pool/pooling.html#boost_pool.pool.pooling.concepts][Pool in More Depth]] (Boost.Pool documentation)

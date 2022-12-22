@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2022-12-21 Wed 12:43 -->
+<!-- 2022-12-22 Thu 18:39 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Derived type calculus based on a simple memory pool</title>
@@ -203,16 +203,21 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org8f90d87">1. Objective</a></li>
-<li><a href="#org69b171b">2. Memory pool as a linked list</a></li>
-<li><a href="#org06e1b85">3. Derived type calculus using the memory pool</a></li>
-<li><a href="#org9ce129d">4. References</a></li>
+<li><a href="#orga686bbe">1. Objective</a></li>
+<li><a href="#orgb17af41">2. Memory pool as a linked list</a></li>
+<li><a href="#org5e0100b">3. Derived type calculus using the memory pool</a></li>
+<li><a href="#org2bfb9ae">4. Design decisions</a>
+<ul>
+<li><a href="#org3fa30d1">4.1. refcount</a></li>
+</ul>
+</li>
+<li><a href="#org33027c1">5. References</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-org8f90d87" class="outline-2">
-<h2 id="org8f90d87"><span class="section-number-2">1.</span> Objective</h2>
+<div id="outline-container-orga686bbe" class="outline-2">
+<h2 id="orga686bbe"><span class="section-number-2">1.</span> Objective</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This document describes a simple memory management strategy enabling
@@ -221,9 +226,9 @@ copy.  For instance
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #228b22;">type(field_t)</span> :: <span style="color: #a0522d;">u, v</span>
+<pre class="src src-f90"><span class="org-type">type(field_t)</span> :: <span class="org-variable-name">u, v</span>
 
-<span style="color: #b22222;">!</span><span style="color: #b22222;">...</span>
+<span class="org-comment-delimiter">!</span><span class="org-comment">...</span>
 
 w = v + 2. * u
 </pre>
@@ -242,8 +247,8 @@ intermediate allocation and data copy are needed.
 </div>
 </div>
 
-<div id="outline-container-org69b171b" class="outline-2">
-<h2 id="org69b171b"><span class="section-number-2">2.</span> Memory pool as a linked list</h2>
+<div id="outline-container-orgb17af41" class="outline-2">
+<h2 id="orgb17af41"><span class="section-number-2">2.</span> Memory pool as a linked list</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 The memory pool is implemented as a linked list of memory blocks
@@ -251,7 +256,7 @@ The memory pool is implemented as a linked list of memory blocks
 </p>
 
 
-<div id="org78670d0" class="figure">
+<div id="org4ef0894" class="figure">
 <p><img src="freelist.png" alt="freelist.png" />
 </p>
 </div>
@@ -269,7 +274,7 @@ with:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #a020f0;">call</span> <span style="color: #0000ff;">init_memory_pool</span>(nblocks, size)
+<pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">init_memory_pool</span>(nblocks, size)
 </pre>
 </div>
 
@@ -279,8 +284,8 @@ Applications can request a block from the memory pool using the
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #a020f0;">use</span> <span style="color: #0000ff;">pool_module</span>, <span style="color: #a020f0;">only</span>: memory_block_t, get_memory_block
-<span style="color: #228b22;">type(memory_block_t)</span>, <span style="color: #a020f0;">pointer</span> :: <span style="color: #a0522d;">memblock_ptr</span>
+<pre class="src src-f90"><span class="org-keyword">use</span> <span class="org-function-name">pool_module</span>, <span class="org-keyword">only</span>: memory_block_t, get_memory_block
+<span class="org-type">type(memory_block_t)</span>, <span class="org-keyword">pointer</span> :: <span class="org-variable-name">memblock_ptr</span>
 
 memblock_ptr =&gt; get_memory_block()
 </pre>
@@ -292,7 +297,7 @@ which target is the head of the memory block list.
 </p>
 
 
-<div id="orgd2577f2" class="figure">
+<div id="orgcd46cbb" class="figure">
 <p><img src="allocation.png" alt="allocation.png" />
 </p>
 </div>
@@ -303,7 +308,7 @@ A memory block can be released to the memory pool using the
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #a020f0;">call</span> <span style="color: #0000ff;">unbind_or_release</span>(memblock_ptr)
+<pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">unbind_or_release</span>(memblock_ptr)
 </pre>
 </div>
 
@@ -320,7 +325,7 @@ free list.
 </p>
 
 
-<div id="org0cffd4a" class="figure">
+<div id="org6f777cc" class="figure">
 <p><img src="deallocation.png" alt="deallocation.png" />
 </p>
 </div>
@@ -331,25 +336,25 @@ deallocated, with
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #a020f0;">call</span> <span style="color: #0000ff;">finalise_memory_pool</span>()
+<pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">finalise_memory_pool</span>()
 </pre>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org06e1b85" class="outline-2">
-<h2 id="org06e1b85"><span class="section-number-2">3.</span> Derived type calculus using the memory pool</h2>
+<div id="outline-container-org5e0100b" class="outline-2">
+<h2 id="org5e0100b"><span class="section-number-2">3.</span> Derived type calculus using the memory pool</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 We introduce a derives type <code>field_t</code> that holds a pointer to a memory block
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #a020f0;">type</span> <span style="color: #0000ff;">field_t</span>
-   <span style="color: #228b22;">type(memory_block_t)</span>, <span style="color: #a020f0;">pointer</span> :: <span style="color: #a0522d;">data =&gt; null()</span>
- <span style="color: #a020f0;">contains</span>
-   <span style="color: #b22222;">! </span><span style="color: #b22222;">...</span>
-<span style="color: #a020f0;">end type</span> <span style="color: #0000ff;">field_t</span>
+<pre class="src src-f90"><span class="org-keyword">type</span> <span class="org-function-name">field_t</span>
+   <span class="org-type">type(memory_block_t)</span>, <span class="org-keyword">pointer</span> :: <span class="org-variable-name">data =&gt; null()</span>
+ <span class="org-keyword">contains</span>
+   <span class="org-comment-delimiter">! </span><span class="org-comment">...</span>
+<span class="org-keyword">end type</span> <span class="org-function-name">field_t</span>
 </pre>
 </div>
 
@@ -359,8 +364,8 @@ instance by calling <code>get_memory_block</code> from the <code>field_t</code> 
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span style="color: #228b22;">type(field_t)</span> :: <span style="color: #a0522d;">u, v</span>
-<span style="color: #b22222;">! </span><span style="color: #b22222;">Construct two distinct field instances</span>
+<pre class="src src-f90"><span class="org-type">type(field_t)</span> :: <span class="org-variable-name">u, v</span>
+<span class="org-comment-delimiter">! </span><span class="org-comment">Construct two distinct field instances</span>
 u = field_t()
 v = field_t()
 </pre>
@@ -372,7 +377,7 @@ memory block:
 </p>
 
 
-<div id="org24eef3b" class="figure">
+<div id="org9544ea0" class="figure">
 <p><img src="field_creation.png" alt="field_creation.png" />
 </p>
 </div>
@@ -384,12 +389,12 @@ assignement operator is defined to redirect <code>v</code>'s memory block pointe
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90">v = u <span style="color: #b22222;">! </span><span style="color: #b22222;">Now both u and v data pointer points to the same memory block</span>
+<pre class="src src-f90">v = u <span class="org-comment-delimiter">! </span><span class="org-comment">Now both u and v data pointer points to the same memory block</span>
 </pre>
 </div>
 
 
-<div id="org90fd49f" class="figure">
+<div id="org228623d" class="figure">
 <p><img src="finalisation_on_assign.png" alt="finalisation_on_assign.png" />
 </p>
 </div>
@@ -425,9 +430,28 @@ pointer (<code>v%data =&gt; u%data</code>).</li>
 </div>
 </div>
 
-<div id="outline-container-org9ce129d" class="outline-2">
-<h2 id="org9ce129d"><span class="section-number-2">4.</span> References</h2>
+<div id="outline-container-org2bfb9ae" class="outline-2">
+<h2 id="org2bfb9ae"><span class="section-number-2">4.</span> Design decisions</h2>
 <div class="outline-text-2" id="text-4">
+</div>
+<div id="outline-container-org3fa30d1" class="outline-3">
+<h3 id="org3fa30d1"><span class="section-number-3">4.1.</span> refcount</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+How to manage refcount? Currently (be289f5) refcount is managed at the
+level of the pool module. When implementating assignment applications
+use pool::bind<sub>block</sub> which takes care of redirect pointer <i>and</i>
+increment refcount.  In the same way <code>operator(+)</code> for
+<code>memory_block_t</code> is responsible for incrementing refcount for the
+block targeted by the returned pointer.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org33027c1" class="outline-2">
+<h2 id="org33027c1"><span class="section-number-2">5.</span> References</h2>
+<div class="outline-text-2" id="text-5">
 <ul class="org-ul">
 <li>[1] <a href="https://www.boost.org/doc/libs/1_81_0/libs/pool/doc/html/boost_pool/pool/pooling.html#boost_pool.pool.pooling.concepts">Pool in More Depth</a> (Boost.Pool documentation)</li>
 <li>[2] <a href="https://theboostcpplibraries.com/boost.pool">Chapter 4 - Boost.Pool</a> (The Boost C++ Libraries)</li>
@@ -443,7 +467,7 @@ expressions and assignments).</li>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Thibault Lestang</p>
-<p class="date">Created: 2022-12-21 Wed 12:43</p>
+<p class="date">Created: 2022-12-22 Thu 18:39</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
