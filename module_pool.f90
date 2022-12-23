@@ -66,34 +66,13 @@ contains
     handle%next => null()
   end function get_memory_block
 
-  function bind_block(memblock_ptr)
-    !> Update refcount for memory block pointed by memblock_ptr and
-    !> returns pointer.
-    type(memory_block_t), pointer, intent(in) :: memblock_ptr
-    type(memory_block_t), pointer :: bind_block
-
-    bind_block => memblock_ptr
-    bind_block%refcount = bind_block%refcount + 1
-  end function bind_block
-
-  subroutine unbind_or_release(handle)
-    !> Decrement refcount for target memory block.  If refcount
-    !> reaches 0, the memory block is released to the pool and pushed
-    !> to the front of the free memory block list.
+  subroutine release(handle)
+    !> Release memory block pointed to by handle to the pool.  It is
+    !> pushed to the front of the free memory block list.
     type(memory_block_t), pointer :: handle
-    ! TODO CLEANUP ASSERT
-    write(*,*) 'Unbinding mem block with refcount', handle%refcount
-    if (handle%refcount == 0) then
-       stop 'Refcount cannot be zero here'
-    end if
-    handle%refcount = handle%refcount - 1
-    if (handle%refcount == 0) then
-       write(*,*) '    Releasing memory block to pool'
-       ! Reattach memory block in front of free list
-       handle%next => first
-       first => handle
-    end if
-  end subroutine unbind_or_release
+    handle%next => first
+    first => handle
+  end subroutine release
 
   subroutine init_memory_pool(nblocks, size)
     !> Constructs a linked list of memory_block_t instances.  Module

@@ -55,7 +55,10 @@ contains
     !> intent(out) or deallocated.
     type(field_t), intent(inout) :: self
     if(associated(self%data)) then
-       call unbind_or_release(self%data)
+       self%data%refcount = self%data%refcount - 1
+       if (self%data%refcount == 0) then
+          call release(self%data)
+       end if
     end if
   end subroutine field_destructor
 
@@ -63,7 +66,8 @@ contains
     !> Defines assignment =.
     type(field_t), intent(out) :: a
     type(field_t), intent(in) :: b
-    a%data => bind_block(b%data)
+    a%data => b%data
+    b%data%refcount = b%data%refcount + 1
   end subroutine field_from_field
 
   function field_add_field(a, b)

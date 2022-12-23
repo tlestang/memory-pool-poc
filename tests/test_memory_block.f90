@@ -3,7 +3,7 @@ program test_memory_block
   use pool_module
   implicit none
 
-  type(memory_block_t), pointer :: block_ptr, block_2_ptr, block_3_ptr
+  type(memory_block_t), pointer :: block_ptr, block_2_ptr
   integer :: expected_length
   integer, allocatable :: expected_ids
 
@@ -38,13 +38,13 @@ program test_memory_block
   end if
 
   block_2_ptr => get_memory_block()
-  block_3_ptr => bind_block(block_ptr)
+  call release(block_ptr)
 
-  if(block_3_ptr%id /= block_ptr%id) then
+  if (.not. all((get_block_ids() == [4, 2, 1]))) then
      allpass = .false.
-     write(stderr, '(a)') 'Block ptr is correctly bound to allocated block ... failed'
+     write(stderr, '(a)') 'Block is correctly released ... failed'
   else
-     write(stderr, '(a)') 'Block ptr is correctly bound to allocated block ... passed'
+     write(stderr, '(a)') 'Block is correctly released ... passed'
   end if
 
   call finalise_memory_pool()
