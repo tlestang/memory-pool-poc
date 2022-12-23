@@ -30,10 +30,6 @@ module pool_module
      module procedure memory_block_constructor
   end interface memory_block_t
 
-  interface operator(+)
-     module procedure :: memory_block_add_memory_block
-  end interface operator(+)
-
   type(memory_block_t), pointer :: first
 
 contains
