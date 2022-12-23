@@ -71,13 +71,13 @@ contains
   end subroutine field_from_field
 
   function field_add_field(a, b)
-    !> Defines operator +. This only a wrapper around the + operator
-    !> for memory_block_t, which returns a pointer to a memory block
-    !> holding the result of the operation.
+    !> Defines operator + for field_t objects.  Result is allocated a
+    !> new memory block from the pool.
     type(field_t) :: field_add_field
     type(field_t), intent(in) :: a
     type(field_t), intent(in) :: b
 
-    field_add_field%data => a%data + b%data
+    field_add_field%data => get_memory_block()
+    field_add_field%data%segment = a%data%segment + b%data%segment
   end function field_add_field
 end module field_module

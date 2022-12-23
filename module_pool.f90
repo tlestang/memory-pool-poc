@@ -129,15 +129,4 @@ contains
     end do
   end function get_block_ids
 
-
-  function memory_block_add_memory_block(a, b) result(c)
-    !> Return a pointer to a new memory block holding the sum of the
-    !> two operands segment.
-    type(memory_block_t), intent(in) :: a, b
-    type(memory_block_t), pointer :: c
-
-    c => get_memory_block()
-    c%segment = a%segment + b%segment
-    c%refcount = c%refcount + 1
-  end function memory_block_add_memory_block
 end module pool_module
