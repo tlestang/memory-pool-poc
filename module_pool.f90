@@ -14,6 +14,10 @@ module pool_module
   !!
   implicit none
 
+  private
+  public :: memory_block_t, init_memory_pool, finalise_memory_pool, &
+       get_memory_block, release, get_block_ids, print_freelist
+
   type :: memory_block_t
      integer :: size
      real, allocatable :: segment(:)

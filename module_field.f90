@@ -11,7 +11,7 @@ module field_module
   !> v = field_t(1.) ! Now v points to memory block 2
   !> w = u + v ! Now w points to memory block 3
   !> v = w ! Now v ponts to memory block 3, and memory block 2 is released to the pool.
-  use pool_module
+  use pool_module, only: memory_block_t, get_memory_block, release
 
   implicit none
 

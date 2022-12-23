@@ -1,6 +1,6 @@
 program main
   use field_module
-  use pool_module
+  use pool_module, only: init_memory_pool, finalise_memory_pool, print_freelist
 
   type(field_t) :: u, v, w
 
