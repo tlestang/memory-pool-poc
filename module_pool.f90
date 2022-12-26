@@ -35,6 +35,7 @@ module pool_module
   end interface memory_block_t
 
   type(memory_block_t), pointer :: first
+  integer :: pool_list_size = 0
 
 contains
 
@@ -80,6 +81,8 @@ contains
     !> the list.
     type(memory_block_t), pointer :: current
     integer :: i, size, nblocks
+
+    pool_list_size = nblocks
 
     nullify(first)
     do i = 1, nblocks
