@@ -47,6 +47,19 @@ program test_memory_block
      write(stderr, '(a)') 'Block is correctly released ... passed'
   end if
 
+  call release(block_2_ptr)
   call finalise_memory_pool()
+
+  call init_memory_pool(2, 16)
+
+  block_ptr => get_memory_block()
+  block_2_ptr => get_memory_block()
+
+  if (.not. all((get_block_ids() == [4, 3]))) then
+     allpass = .false.
+     write(stderr, '(a)') 'Memory pool is correctly extended ... failed'
+  else
+     write(stderr, '(a)') 'Memory pool is correctly extended ... passed'
+  end if
 
 end program test_memory_block

@@ -62,10 +62,44 @@ contains
     !> Example
     !>     f%data => get_memory_block()
     type(memory_block_t), pointer :: handle
+    ! If we're about to allocate the last block, extend the pool
+    ! first.
+    if(.not. associated(first%next)) then
+       call extend_pool()
+    end if
     handle => first
     first => first%next
     handle%next => null()
   end function get_memory_block
+
+  subroutine extend_pool()
+    !> Extend the memory pool twice by twice its size.  Construct a
+    !> independant list of memory blocks and attach it to last block
+    !> in original pool.
+    type(memory_block_t), pointer :: tail, head, current
+    integer :: id
+
+    ! Make tail pointer point to last block in the free block list
+    tail => first
+    do
+       if(.not. associated(tail%next)) exit ! It's the last block in the list
+       tail => tail%next
+    end do
+
+    ! Construct another pool of size pool_list_size
+    nullify(head)
+    do id = pool_list_size + 1, 2 * pool_list_size
+       allocate(current)
+       !> Construct a memory_block_t. This effectively allocates
+       !> storage space.
+       current = memory_block_t(16, head, id=id)
+       head => current
+    end do
+    ! Now attach newly created list to from pointer
+    tail%next => head
+
+    pool_list_size = 2 * pool_list_size
+  end subroutine extend_pool
 
   subroutine release(handle)
     !> Release memory block pointed to by handle to the pool.  It is
