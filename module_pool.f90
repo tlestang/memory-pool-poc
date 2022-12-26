@@ -34,8 +34,9 @@ module pool_module
      module procedure memory_block_constructor
   end interface memory_block_t
 
-  type(memory_block_t), pointer :: first
+  type(memory_block_t), pointer :: first => null()
   integer :: pool_list_size = 0
+  integer :: pool_blk_size = 0
 
 contains
 
@@ -92,7 +93,7 @@ contains
        allocate(current)
        !> Construct a memory_block_t. This effectively allocates
        !> storage space.
-       current = memory_block_t(16, head, id=id)
+       current = memory_block_t(pool_blk_size, head, id=id)
        head => current
     end do
     ! Now attach newly created list to from pointer
@@ -114,16 +115,17 @@ contains
     !> global pointer first always points to the first memory block on
     !> the list.
     type(memory_block_t), pointer :: current
-    integer :: i, size, nblocks
+    integer :: id, size, nblocks
 
     pool_list_size = nblocks
+    pool_blk_size = size
 
     nullify(first)
-    do i = 1, nblocks
+    do id = 1, pool_list_size
        allocate(current)
        !> Construct a memory_block_t. This effectiveley allocates
        !> storage space.
-       current = memory_block_t(size, first, id=i)
+       current = memory_block_t(pool_blk_size, first, id=id)
        first => current
     end do
   end subroutine init_memory_pool
