@@ -95,9 +95,9 @@ img{
     margin: 1rem;    background-color: #EEE;    padding: 0.5rem;    border-radius: 0.2rem;    font-size: var(--font-size-small) !important;
 }
 
-.outline-3{
-    display: grid;    grid-template-columns: 40fr 60fr;
-}
+/* .outline-3{ */
+/*     display: grid;    grid-template-columns: 40fr 60fr; */
+/* } */
 
 /* Responsive content positioning */@media only screen and (min-width: 750px) /* Large screens */{
     .outline-3{
