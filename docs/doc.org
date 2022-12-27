@@ -1,6 +1,6 @@
 # -*- org-confirm-babel-evaluate: nil; org-html-htmlize-output-type: css; -*-
 #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/rethink_inline.css"/>
-#+HTML_HEAD_EXTRA: <link rel="highlighting" type="text/css" href="css/highlighting.css"/>
+#+HTML_HEAD_EXTRA: <link rel="stylesheet" type="text/css" href="css/highlighting.css"/>
 
 #+PROPERTY: header-args:dot :exports results
 #+PROPERTY: header-args:f90 :exports code
@@ -123,6 +123,63 @@ deallocated, with
 
 #+begin_src f90
     call finalise_memory_pool()
+#+end_src
+
+Whenever the last memory block in the list is requested, the pool is
+automatically extended, doubling the size of the free list. For
+example, considering a memory pool made of 3 blocks with the first two
+being allocated.
+
+#+begin_src dot :file empty_pool.png :cmdline -Kdot -Tpng
+  digraph empty_pool {
+
+  subgraph cluster_list {
+	  label = "Free list"
+	  memblock3 [label="memory block\lid: 3"];
+
+	  memblock3;
+  }
+
+  subgraph cluster_field {
+	  rankdir=LR;
+	  field1 [shape=box, label="u"]
+	  field2 [shape=box, label="v"]
+	  memblock1 [label="memory block\lid: 1\lrefcount: 1\l"]
+	  memblock2 [label="memory block\lid: 2\lrefcount: 1\l"]
+
+
+	  field1 -> memblock1
+	  field2 -> memblock2
+  }}
+#+end_src
+
+If the last remaining block is requested, before allocation, the
+memory pool is extended into
+
+#+begin_src dot :file pool_extension.png :cmdline -Kdot -Tpng
+  digraph pool_extension {
+
+  subgraph cluster_list {
+	  label = "Free list"
+	  memblock3 [label="memory block\lid: 3"];
+	  memblock4 [label="memory block\lid: 4"];
+	  memblock5 [label="memory block\lid: 5"];
+	  memblock6 [label="memory block\lid: 6"];
+
+	  memblock3 -> memblock4 -> memblock5 -> memblock6;
+  }
+
+  subgraph cluster_field {
+	  rankdir=LR;
+	  field1 [shape=box, label="u"]
+	  field2 [shape=box, label="v"]
+	  memblock1 [label="memory block\lid: 1\lrefcount: 1\l"]
+	  memblock2 [label="memory block\lid: 2\lrefcount: 1\l"]
+
+
+	  field1 -> memblock1
+	  field2 -> memblock2
+  }}
 #+end_src
 
 * Derived type calculus using the memory pool
@@ -254,7 +311,7 @@ Let's unpack what happens in an assignment statement such as
 #+end_src
 
 1. Memory block targeted by =v='s =data= pointer is released, or its
-   reference count decremented, through =unbind_or_release=.
+   reference count decremented.
 2. =v='s data pointer is made to point to the target of =u='s data
    pointer (=v%data => u%data=).
 3. The reference count for the targeted memory block is increased by 1.

@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2022-12-22 Thu 18:39 -->
+<!-- 2022-12-27 Tue 17:39 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Derived type calculus based on a simple memory pool</title>
@@ -194,7 +194,7 @@
   .org-svg { }
 </style>
 <link rel="stylesheet" type="text/css" href="css/rethink_inline.css"/>
-<link rel="highlighting" type="text/css" href="css/highlighting.css"/>
+<link rel="stylesheet" type="text/css" href="css/highlighting.css"/>
 </head>
 <body>
 <div id="content" class="content">
@@ -203,21 +203,21 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orga686bbe">1. Objective</a></li>
-<li><a href="#orgb17af41">2. Memory pool as a linked list</a></li>
-<li><a href="#org5e0100b">3. Derived type calculus using the memory pool</a></li>
-<li><a href="#org2bfb9ae">4. Design decisions</a>
+<li><a href="#org71b7d34">1. Objective</a></li>
+<li><a href="#org02976dc">2. Memory pool as a linked list</a></li>
+<li><a href="#org27c2f12">3. Derived type calculus using the memory pool</a>
 <ul>
-<li><a href="#org3fa30d1">4.1. refcount</a></li>
+<li><a href="#orgbd2d4f1">3.1. Assignment and reference counting</a></li>
+<li><a href="#org665b2b3">3.2. Binary operators: addition</a></li>
 </ul>
 </li>
-<li><a href="#org33027c1">5. References</a></li>
+<li><a href="#orgaf859b8">4. References</a></li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-orga686bbe" class="outline-2">
-<h2 id="orga686bbe"><span class="section-number-2">1.</span> Objective</h2>
+<div id="outline-container-org71b7d34" class="outline-2">
+<h2 id="org71b7d34"><span class="section-number-2">1.</span> Objective</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This document describes a simple memory management strategy enabling
@@ -247,8 +247,8 @@ intermediate allocation and data copy are needed.
 </div>
 </div>
 
-<div id="outline-container-orgb17af41" class="outline-2">
-<h2 id="orgb17af41"><span class="section-number-2">2.</span> Memory pool as a linked list</h2>
+<div id="outline-container-org02976dc" class="outline-2">
+<h2 id="org02976dc"><span class="section-number-2">2.</span> Memory pool as a linked list</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 The memory pool is implemented as a linked list of memory blocks
@@ -256,7 +256,7 @@ The memory pool is implemented as a linked list of memory blocks
 </p>
 
 
-<div id="org4ef0894" class="figure">
+<div id="org37a42a3" class="figure">
 <p><img src="freelist.png" alt="freelist.png" />
 </p>
 </div>
@@ -297,35 +297,30 @@ which target is the head of the memory block list.
 </p>
 
 
-<div id="orgcd46cbb" class="figure">
+<div id="org2f31962" class="figure">
 <p><img src="allocation.png" alt="allocation.png" />
 </p>
 </div>
 
 <p>
 A memory block can be released to the memory pool using the
-<code>unbind_or_release</code> subroutine.
+<code>release</code> subroutine.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">unbind_or_release</span>(memblock_ptr)
+<pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">release</span>(memblock_ptr)
 </pre>
 </div>
 
 <p>
-A memory block's metadata include its <i>reference count</i>, an integer
-counting the number of pointers pointing to the memory block.  A
-memory block available in the memory pool has a reference count of 0.
-Assignment of a memory block to a <code>memory_block_t</code> pointer increments
-it reference count by 1.  The <code>unbind_or_release</code> subroutine
-decrements the reference count of the memory block targeted by
-<code>memblock_ptr</code>. If the blocks's reference count reaches 0, the block
-is released to the memory pool: it is pushed back to the front of the
-free list.
+A memory block's metadata include an integer <code>refcount</code>, for
+<i>reference count</i>.  Applications using the memory pool can increase or
+decrease this number to track how many times a particular memory block
+is referenced by one or more objects.
 </p>
 
 
-<div id="org6f777cc" class="figure">
+<div id="orgdde514d" class="figure">
 <p><img src="deallocation.png" alt="deallocation.png" />
 </p>
 </div>
@@ -339,11 +334,35 @@ deallocated, with
 <pre class="src src-f90"><span class="org-keyword">call</span> <span class="org-function-name">finalise_memory_pool</span>()
 </pre>
 </div>
+
+<p>
+Whenever the last memory block in the list is requested, the pool is
+automatically extended, doubling the size of the free list. For
+example, considering a memory pool made of 3 blocks with the first two
+being allocated.
+</p>
+
+
+<div id="org2a56c3c" class="figure">
+<p><img src="empty_pool.png" alt="empty_pool.png" />
+</p>
+</div>
+
+<p>
+If the last remaining block is requested, before allocation, the
+memory pool is extended into
+</p>
+
+
+<div id="orgd064ec9" class="figure">
+<p><img src="pool_extension.png" alt="pool_extension.png" />
+</p>
+</div>
 </div>
 </div>
 
-<div id="outline-container-org5e0100b" class="outline-2">
-<h2 id="org5e0100b"><span class="section-number-2">3.</span> Derived type calculus using the memory pool</h2>
+<div id="outline-container-org27c2f12" class="outline-2">
+<h2 id="org27c2f12"><span class="section-number-2">3.</span> Derived type calculus using the memory pool</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 We introduce a derives type <code>field_t</code> that holds a pointer to a memory block
@@ -377,15 +396,20 @@ memory block:
 </p>
 
 
-<div id="org9544ea0" class="figure">
+<div id="org85ef920" class="figure">
 <p><img src="field_creation.png" alt="field_creation.png" />
 </p>
 </div>
+</div>
 
+<div id="outline-container-orgbd2d4f1" class="outline-3">
+<h3 id="orgbd2d4f1"><span class="section-number-3">3.1.</span> Assignment and reference counting</h3>
+<div class="outline-text-3" id="text-3-1">
 <p>
 By default, an assignment statement like <code>v=u</code> would result in a copy
 or automatic allocation on assignment.  Instead, the <code>field_t</code>
-assignement operator is defined to redirect <code>v</code>'s memory block pointer to <code>u</code>'s.
+assignement operator is defined to redirect <code>v</code>'s memory block pointer
+to <code>u</code>'s.
 </p>
 
 <div class="org-src-container">
@@ -394,21 +418,50 @@ assignement operator is defined to redirect <code>v</code>'s memory block pointe
 </div>
 
 
-<div id="org228623d" class="figure">
+<div id="orgc5b7dec" class="figure">
 <p><img src="finalisation_on_assign.png" alt="finalisation_on_assign.png" />
 </p>
 </div>
 
 <p>
-Notice how the reference count for memory block 0 is increased to two.
+The <code>memory_block_t</code> type includes a integer component <code>refcount</code> that
+can be used to count the number of pointers pointing to a
+<code>memory_block_t</code> instance.  The assignment operator for <code>field_t</code>
+increases the target memory block's reference count by 1.
 </p>
 
+<div class="org-src-container">
+<pre class="src src-f90"><span class="org-keyword">module</span> <span class="org-function-name">pool_module</span>
+
+  <span class="org-keyword">interface assignment</span>(=)
+   <span class="org-keyword">module procedure</span> <span class="org-function-name">field_from_field</span>
+  <span class="org-keyword">end interface assignment</span>(=)
+
+<span class="org-keyword">contains</span>
+
+  <span class="org-keyword">subroutine</span> <span class="org-function-name">field_from_field</span>(a, b)
+    <span class="org-comment-delimiter">!</span><span class="org-comment">&gt; Defines assignment =.</span>
+    <span class="org-type">type(field_t)</span>, <span class="org-keyword">intent</span>(out) :: <span class="org-variable-name">a</span>
+    <span class="org-type">type(field_t)</span>, <span class="org-keyword">intent</span>(in) :: <span class="org-variable-name">b</span>
+    a%memblock =&gt; b%memblock
+    b%memblock%refcount = b%memblock%refcount + 1
+  <span class="org-keyword">end subroutine</span> <span class="org-function-name">field_from_field</span>
+
+<span class="org-keyword">end module</span> <span class="org-function-name">pool_module</span>
+</pre>
+</div>
+
+
 <p>
-Objects of type <code>field_t</code> automatically release the memory block they
-point to when they are on the left hand side of an assignment or
-passed to a procedure in which the corresponding dummy argument as the
-<code>intent(out)</code> attribute. This behavior comes from marking the field
-destructor as <code>final</code> in the <code>field_t</code> derived type definition (see [5]).
+A block's reference count is decremented each time the <code>final</code>
+precedure <code>field_destructor</code> is called. If the blocks's reference
+count reaches 0, the block is released to the memory pool through the
+<code>release</code> subroutine.  Using the <code>final</code> keyword for
+<code>field_desctructor</code> in the in the <code>field_t</code> means that objects of type
+<code>field_t</code> automatically release the memory block they point to when
+they are on the left hand side of an assignment, passed to a procedure
+in which the corresponding dummy argument as the <code>intent(out)</code>
+attribute or deallocated.
 </p>
 
 <p>
@@ -422,7 +475,7 @@ Let's unpack what happens in an assignment statement such as
 
 <ol class="org-ol">
 <li>Memory block targeted by <code>v</code>'s <code>data</code> pointer is released, or its
-reference count decremented, through <code>unbind_or_release</code>.</li>
+reference count decremented.</li>
 <li><code>v</code>'s data pointer is made to point to the target of <code>u</code>'s data
 pointer (<code>v%data =&gt; u%data</code>).</li>
 <li>The reference count for the targeted memory block is increased by 1.</li>
@@ -430,28 +483,53 @@ pointer (<code>v%data =&gt; u%data</code>).</li>
 </div>
 </div>
 
-<div id="outline-container-org2bfb9ae" class="outline-2">
-<h2 id="org2bfb9ae"><span class="section-number-2">4.</span> Design decisions</h2>
-<div class="outline-text-2" id="text-4">
-</div>
-<div id="outline-container-org3fa30d1" class="outline-3">
-<h3 id="org3fa30d1"><span class="section-number-3">4.1.</span> refcount</h3>
-<div class="outline-text-3" id="text-4-1">
+<div id="outline-container-org665b2b3" class="outline-3">
+<h3 id="org665b2b3"><span class="section-number-3">3.2.</span> Binary operators: addition</h3>
+<div class="outline-text-3" id="text-3-2">
 <p>
-How to manage refcount? Currently (be289f5) refcount is managed at the
-level of the pool module. When implementating assignment applications
-use pool::bind<sub>block</sub> which takes care of redirect pointer <i>and</i>
-increment refcount.  In the same way <code>operator(+)</code> for
-<code>memory_block_t</code> is responsible for incrementing refcount for the
-block targeted by the returned pointer.
+A statment of the form
+</p>
+
+<div class="org-src-container">
+<pre class="src src-f90">w = u + v
+</pre>
+</div>
+
+<p>
+will request a free memory block from the pool for the result of
+<code>u+v</code>, which <code>segment</code> component is made to hold the result of the
+addition.  The assignment operator <code>=</code> then takes care of pointing
+<code>w</code>'s memory block pointer to it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-f90"><span class="org-keyword">function</span> <span class="org-function-name">field_add_field</span>(a, b)
+  <span class="org-comment-delimiter">!</span><span class="org-comment">&gt; Defines operator + for field_t objects.  Result is allocated a</span>
+  <span class="org-comment-delimiter">!</span><span class="org-comment">&gt; new memory block from the pool.</span>
+  <span class="org-type">type(field_t)</span> :: <span class="org-variable-name">field_add_field</span>
+  <span class="org-type">type(field_t)</span>, <span class="org-keyword">intent</span>(in) :: <span class="org-variable-name">a</span>
+  <span class="org-type">type(field_t)</span>, <span class="org-keyword">intent</span>(in) :: <span class="org-variable-name">b</span>
+
+  field_add_field%data =&gt; get_memory_block()
+  field_add_field%data%segment = a%data%segment + b%data%segment
+<span class="org-keyword">end function</span> <span class="org-function-name">field_add_field</span>
+</pre>
+</div>
+
+<p>
+<b><b>note</b></b> I think that if <code>w</code> is <code>allocatable</code>, then the assignment
+would trigger the deallocation and reallocation data - even if <code>w</code>'s
+size and shape doesn't change.  In this case using the memory pool
+allows to not allocate from the system.  Not sure of the behavior if
+<code>w</code> isn't <code>=allocatable</code>
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org33027c1" class="outline-2">
-<h2 id="org33027c1"><span class="section-number-2">5.</span> References</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-orgaf859b8" class="outline-2">
+<h2 id="orgaf859b8"><span class="section-number-2">4.</span> References</h2>
+<div class="outline-text-2" id="text-4">
 <ul class="org-ul">
 <li>[1] <a href="https://www.boost.org/doc/libs/1_81_0/libs/pool/doc/html/boost_pool/pool/pooling.html#boost_pool.pool.pooling.concepts">Pool in More Depth</a> (Boost.Pool documentation)</li>
 <li>[2] <a href="https://theboostcpplibraries.com/boost.pool">Chapter 4 - Boost.Pool</a> (The Boost C++ Libraries)</li>
@@ -467,7 +545,7 @@ expressions and assignments).</li>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Thibault Lestang</p>
-<p class="date">Created: 2022-12-22 Thu 18:39</p>
+<p class="date">Created: 2022-12-27 Tue 17:39</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
