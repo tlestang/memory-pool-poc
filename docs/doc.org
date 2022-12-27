@@ -91,21 +91,16 @@ which target is the head of the memory block list.
 [[file:freelist.png]]
 
 A memory block can be released to the memory pool using the
-=unbind_or_release= subroutine.
+=release= subroutine.
 
 #+begin_src f90
-    call unbind_or_release(memblock_ptr)
+    call release(memblock_ptr)
 #+end_src
 
-A memory block's metadata include its /reference count/, an integer
-counting the number of pointers pointing to the memory block.  A
-memory block available in the memory pool has a reference count of 0.
-Assignment of a memory block to a =memory_block_t= pointer increments
-it reference count by 1.  The =unbind_or_release= subroutine
-decrements the reference count of the memory block targeted by
-=memblock_ptr=. If the blocks's reference count reaches 0, the block
-is released to the memory pool: it is pushed back to the front of the
-free list.
+A memory block's metadata include an integer =refcount=, for
+/reference count/.  Applications using the memory pool can increase or
+decrease this number to track how many times a particular memory block
+is referenced by one or more objects.
 
 #+begin_src dot :file deallocation.png :cmdline -Kdot -Tpng
   digraph deallocation {
@@ -178,9 +173,13 @@ memory block:
   }}
 #+end_src
 
+** Assignment and reference counting
+
+
 By default, an assignment statement like =v=u= would result in a copy
 or automatic allocation on assignment.  Instead, the =field_t=
-assignement operator is defined to redirect =v='s memory block pointer to =u='s.
+assignement operator is defined to redirect =v='s memory block pointer
+to =u='s.
 
 #+begin_src f90
     v = u ! Now both u and v data pointer points to the same memory block
@@ -212,13 +211,41 @@ assignement operator is defined to redirect =v='s memory block pointer to =u='s.
 #+RESULTS:
 [[file:sample.png]]
 
-Notice how the reference count for memory block 0 is increased to two.
+The =memory_block_t= type includes a integer component =refcount= that
+can be used to count the number of pointers pointing to a
+=memory_block_t= instance.  The assignment operator for =field_t=
+increases the target memory block's reference count by 1.
 
-Objects of type =field_t= automatically release the memory block they
-point to when they are on the left hand side of an assignment or
-passed to a procedure in which the corresponding dummy argument as the
-=intent(out)= attribute. This behavior comes from marking the field
-destructor as =final= in the =field_t= derived type definition (see [5]).
+#+begin_src f90
+  module pool_module
+
+    interface assignment(=)
+     module procedure field_from_field
+    end interface assignment(=)
+
+  contains
+
+    subroutine field_from_field(a, b)
+      !> Defines assignment =.
+      type(field_t), intent(out) :: a
+      type(field_t), intent(in) :: b
+      a%memblock => b%memblock
+      b%memblock%refcount = b%memblock%refcount + 1
+    end subroutine field_from_field
+
+  end module pool_module
+#+end_src
+
+
+A block's reference count is decremented each time the =final=
+precedure =field_destructor= is called. If the blocks's reference
+count reaches 0, the block is released to the memory pool through the
+=release= subroutine.  Using the =final= keyword for
+=field_desctructor= in the in the =field_t= means that objects of type
+=field_t= automatically release the memory block they point to when
+they are on the left hand side of an assignment, passed to a procedure
+in which the corresponding dummy argument as the =intent(out)=
+attribute or deallocated.
 
 Let's unpack what happens in an assignment statement such as
 
@@ -232,16 +259,37 @@ Let's unpack what happens in an assignment statement such as
    pointer (=v%data => u%data=).
 3. The reference count for the targeted memory block is increased by 1.
 
-* Design decisions
+** Binary operators: addition
 
-** refcount
+A statment of the form
 
-How to manage refcount? Currently (be289f5) refcount is managed at the
-level of the pool module. When implementating assignment applications
-use pool::bind_block which takes care of redirect pointer /and/
-increment refcount.  In the same way =operator(+)= for
-=memory_block_t= is responsible for incrementing refcount for the
-block targeted by the returned pointer.
+#+begin_src f90
+    w = u + v
+#+end_src
+
+will request a free memory block from the pool for the result of
+=u+v=, which =segment= component is made to hold the result of the
+addition.  The assignment operator === then takes care of pointing
+=w='s memory block pointer to it.
+
+#+begin_src f90
+  function field_add_field(a, b)
+    !> Defines operator + for field_t objects.  Result is allocated a
+    !> new memory block from the pool.
+    type(field_t) :: field_add_field
+    type(field_t), intent(in) :: a
+    type(field_t), intent(in) :: b
+
+    field_add_field%data => get_memory_block()
+    field_add_field%data%segment = a%data%segment + b%data%segment
+  end function field_add_field
+#+end_src
+
+**note** I think that if =w= is =allocatable=, then the assignment
+would trigger the deallocation and reallocation data - even if =w='s
+size and shape doesn't change.  In this case using the memory pool
+allows to not allocate from the system.  Not sure of the behavior if
+=w= isn't ==allocatable=
 
 * References
 
